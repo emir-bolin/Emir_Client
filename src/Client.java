@@ -1,59 +1,54 @@
 import java.net.*;
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 
 public class Client {
 
-    public static void main(String[] args) {
-
-        Socket client = null;
-
+    public static void main(String args[]) throws Exception {
         // Default port number we are going to use
-        int portnumber = 8000;
-        if (args.length >= 1){
+        int portnumber = 8002;
+        if (args.length >= 1) {
             portnumber = Integer.parseInt(args[0]);
         }
-        for (int i = 0; i < 10; i++){
-            try{
-                String msg = "";
 
-                // Create a client socket
-                client = new Socket(InetAddress.getLocalHost(), portnumber);
-                System.out.println("Client socket is created" + client);
+        // Create a MulticastSocket for sending messages
+        MulticastSocket chatSendSocket = new MulticastSocket();
 
-                // Create an output stream of the client socket
-                OutputStream clientOut = client.getOutputStream();
-                PrintWriter pw = new PrintWriter(clientOut, true);
+        // Create a MulticastSocket for receiving responses
+        MulticastSocket chatReceiveSocket = new MulticastSocket(portnumber);
 
-                // Create an input stream of client socket
-                InputStream clientIn = client.getInputStream();
-                BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+        // Determine the IP address of a host, given the host name
+        InetAddress group = InetAddress.getByName("225.4.5.6");
 
-                // Create Buffered Reader for a standard input
-                BufferedReader stdIn = new BufferedReader(new InputStreamReader(System.in));
+        // Joins a multicast group for receiving responses
+        chatReceiveSocket.joinGroup(group);
 
-                System.out.println("Enter your name. Type Bye to exit. ");
+        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+        String msg = "";
 
-        /*
-        Read data form standard input device and write it
-        to the output stream fo the client socket.
-         */
-                msg = stdIn.readLine().trim();
-                pw.println(msg);
+        // Loop for sending messages
+        while (true) {
+            System.out.println("Type a message for the server (or type 'exit' to quit):");
+            msg = br.readLine();
 
-                // Read data form the input stream of the client socket.
-                System.out.println("Message returned from the server = " + br.readLine());
-
-                pw.close();
-                br.close();
-                client.close();
-
-                // Stop the operation
-                if (msg.equalsIgnoreCase("Bye")){
-                    break;
-                }
-            } catch (IOException ie){
-                System.out.println("I/O error " + ie);
+            if (msg.equalsIgnoreCase("exit")) {
+                break;
             }
+
+            // Send the message to Multicast address
+            DatagramPacket data = new DatagramPacket(msg.getBytes(StandardCharsets.UTF_8), msg.length(), group, portnumber);
+            chatSendSocket.send(data);
+
+            // Prepare to receive the result from the server
+            byte[] buf = new byte[1024];
+            DatagramPacket resultPacket = new DatagramPacket(buf, buf.length);
+            chatReceiveSocket.receive(resultPacket);
+            String result = new String(resultPacket.getData(), StandardCharsets.UTF_8).trim();
+            System.out.println(result);
         }
+
+        // Close the sockets
+        chatSendSocket.close();
+        chatReceiveSocket.close();
     }
 }
